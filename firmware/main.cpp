@@ -17,7 +17,7 @@
 #include "NeoPixel.h"
 
 
-#define LED_COUNT                           5
+#define LED_COUNT                           16
 #define SECONDS_BETWEEN_ANIMATION_SWITCH    2
 #define DUMP_COUNTERS                       1
 
@@ -53,7 +53,7 @@ enum Animations
     Max_Animation
 };
 
-static Animations        g_currAnimation = Solid_White;
+static Animations        g_currAnimation = Candle_Flicker; // Solid_White;
 static IPixelUpdate*     g_pPixelUpdate;
 
 
@@ -419,10 +419,10 @@ static void updateAnimation()
         }
     case Candle_Flicker:
         {
-            flickerProperties.timeMin = 2;
-            flickerProperties.timeMax = 3;
-            flickerProperties.stayBrightFactor = 2;
-            flickerProperties.brightnessMin = 128;
+            flickerProperties.timeMin = 5;
+            flickerProperties.timeMax = 250;
+            flickerProperties.stayBrightFactor = 5;
+            flickerProperties.brightnessMin = 140;
             flickerProperties.brightnessMax = 255;
             flickerProperties.baseRGBColour = DARK_ORANGE;
             flicker.setProperties(&flickerProperties);
@@ -443,10 +443,12 @@ static void updateAnimation()
 
 static void advanceToNextAnimation()
 {
+#ifdef UNDONE
     g_currAnimation = (Animations)(g_currAnimation + 1);
     if (g_currAnimation >= Max_Animation)
     {
         g_currAnimation = Solid_White;
     }
     updateAnimation();
+#endif // UNDONE
 }
