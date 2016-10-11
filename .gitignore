@@ -1,0 +1,19 @@
+.DS_Store
+
+# Build Output
+*.bin
+*.disasm
+*.elf
+*.hex
+*.map
+*.o
+*.d
+*.a
+
+# GDB Stub Logfiles
+mri.log
+pyocd.log
+gdb.log
+
+# Personal deploy scripts
+deploy
