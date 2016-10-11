@@ -178,8 +178,8 @@ void NeoPixel::set(const RGBData* pPixels, size_t pixelCount)
     {
         RGBData led = *pPixels++;
 
-        emitByte(led.red);
         emitByte(led.green);
+        emitByte(led.red);
         emitByte(led.blue);
     }
 
