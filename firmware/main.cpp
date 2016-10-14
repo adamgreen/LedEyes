@@ -15,42 +15,72 @@
 #include <mbed.h>
 #include "Adafruit_LEDBackpack.h"
 #include "Animation.h"
+#include "EyeAnimations.h"
 #include "NeoPixel.h"
 
 
+// The number of LEDs in the Adafruit ring used for the candle.
 #define LED_COUNT                           16
+// The 7-bit I2C address for the left eye 8x8 matrix.
+#define LEFT_EYE_I2C_ADDRESS                0x70
+// The 7-bit I2C address for the right eye 8x8 matrix.
+#define RIGHT_EYE_I2C_ADDRESS               0x71
+// The number of seconds between dumping of animation performance counters to the serial port.
 #define SECONDS_BETWEEN_COUNTER_DUMPS       10
+// The number of milliseconds to delay betweenn initial centering of eyes and initial eye wink.
+#define MILLISECONDS_FOR_INITIAL_DELAY      2000
 
+// Utility macros.
 #define ARRAY_SIZE(X) (sizeof(X)/sizeof(X[0]))
 
 
-static IPixelUpdate*     g_pPixelUpdate;
+enum EyeState
+{
+    STATE_INIT,
+    STATE_INITIAL_DELAY,
+    STATE_INITIAL_LEFT_EYE_WINK,
+    STATE_INITIAL_RIGHT_EYE_WINK,
+    STATE_DELAY_AFTER_WINK,
+    STATE_START_LOOP,
+    STATE_MOVING_EYES,
+    STATE_DELAY_AFTER_MOVE,
+    STATE_BLINKING,
+    STATE_DELAY_AFTER_BLINK,
+    STATE_DONE // UNDONE:
+};
+
+static IPixelUpdate*    g_pCandleFlicker;
 
 
 // Function Prototypes.
-static void initAnimation();
-static void testEyes();
+static void initCandleFlicker();
+static int random(int low, int high);
 
 
 int main()
 {
-    uint32_t lastFlipCount = 0;
-    uint32_t lastSetCount = 0;
-    static   DigitalOut myled(LED1);
-    static   NeoPixel   ledControl(LED_COUNT, p11);
-    static   Timer      timer;
-    static   Timer      ledTimer;
+    uint32_t             lastFlipCount = 0;
+    uint32_t             lastSetCount = 0;
+    static   DigitalOut  myled(LED1);
+    static   NeoPixel    ledControl(LED_COUNT, p11);
+    static   Timer       timer;
+    static   Timer       ledTimer;
+    static   I2C         i2cEyeMatrices(p9, p10);
+    static   EyeMatrices eyes(&i2cEyeMatrices, LEFT_EYE_I2C_ADDRESS, RIGHT_EYE_I2C_ADDRESS);
+    EyeState             eyeState = STATE_INIT;
+    EyeAnimationBase*    pCurrEyeAnimation = NULL;
+    DelayAnimation       delayAnimation(&eyes);
+    BlinkAnimation       blinkAnimation(&eyes);
+    MoveEyeAnimation     moveEyeAnimation(&eyes);
 
-    initAnimation();
+    initCandleFlicker();
     ledControl.start();
 
     timer.start();
     ledTimer.start();
 
-    testEyes();
     while(1)
     {
-
         if (SECONDS_BETWEEN_COUNTER_DUMPS > 0 && timer.read_ms() > SECONDS_BETWEEN_COUNTER_DUMPS * 1000)
         {
             uint32_t currSetCount = ledControl.getSetCount();
@@ -67,7 +97,117 @@ int main()
             lastSetCount = currSetCount;
             lastFlipCount = currFlipCount;
         }
-        g_pPixelUpdate->updatePixels(ledControl);
+        g_pCandleFlicker->updatePixels(ledControl);
+
+        // Run the eye animation state machine.
+        if (pCurrEyeAnimation)
+            pCurrEyeAnimation->run();
+        switch (eyeState)
+        {
+        case STATE_INIT:
+            // Center the eyes to initialize the state.
+            eyes.init();
+            delayAnimation.start(MILLISECONDS_FOR_INITIAL_DELAY);
+            pCurrEyeAnimation = &delayAnimation;
+            eyeState = STATE_INITIAL_DELAY;
+            break;
+        case STATE_INITIAL_DELAY:
+            // Wait MILLISECONDS_FOR_INITIAL_DELAY msecs (2 seconds) before initial wink.
+            assert ( pCurrEyeAnimation == &delayAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                eyeState = STATE_INITIAL_LEFT_EYE_WINK;
+                blinkAnimation.start(true, false);
+                pCurrEyeAnimation = &blinkAnimation;
+            }
+            break;
+        case STATE_INITIAL_LEFT_EYE_WINK:
+            // Wink the left eye.
+            assert ( pCurrEyeAnimation == &blinkAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                eyeState = STATE_INITIAL_RIGHT_EYE_WINK;
+                blinkAnimation.start(false, true);
+                pCurrEyeAnimation = &blinkAnimation;
+            }
+            break;
+        case STATE_INITIAL_RIGHT_EYE_WINK:
+            // Then wink the right eye.
+            assert ( pCurrEyeAnimation == &blinkAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                eyeState = STATE_DELAY_AFTER_WINK;
+                delayAnimation.start(1000);
+                pCurrEyeAnimation = &delayAnimation;
+            }
+            break;
+        case STATE_DELAY_AFTER_WINK:
+            // Delay for 1 second after initial wink.
+            assert ( pCurrEyeAnimation == &delayAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                eyeState = STATE_START_LOOP;
+                pCurrEyeAnimation = NULL;
+            }
+            break;
+        case STATE_START_LOOP:
+            // Start the main loop of eye movement animations.
+            eyeState = STATE_MOVING_EYES;
+            moveEyeAnimation.start(random(EyeMatrices::PupilLimits::MIN, EyeMatrices::PupilLimits::MAX + 1),
+                                   random(EyeMatrices::PupilLimits::MIN, EyeMatrices::PupilLimits::MAX + 1),
+                                   50);
+            pCurrEyeAnimation = &moveEyeAnimation;
+            break;
+        case STATE_MOVING_EYES:
+            // Moving eyes around to random offset.
+            assert ( pCurrEyeAnimation == &moveEyeAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                delayAnimation.start(random(5, 7) * 500);
+                pCurrEyeAnimation = &delayAnimation;
+                eyeState = STATE_DELAY_AFTER_MOVE;
+            }
+            break;
+        case STATE_DELAY_AFTER_MOVE:
+            // Random delay after eye movement.
+            assert ( pCurrEyeAnimation == &delayAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                if (random(0, 5) == 0)
+                {
+                    blinkAnimation.start(true, true);
+                    pCurrEyeAnimation = &blinkAnimation;
+                    eyeState = STATE_BLINKING;
+                }
+                else
+                {
+                    eyeState = STATE_START_LOOP;
+                    pCurrEyeAnimation = NULL;
+                }
+            }
+            break;
+        case STATE_BLINKING:
+            // Sometimes we will enter this state from STATE_DELAY_AFTER_MOVE to blink.
+            assert ( pCurrEyeAnimation == &blinkAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                eyeState = STATE_DELAY_AFTER_BLINK;
+                delayAnimation.start(500);
+                pCurrEyeAnimation = &delayAnimation;
+            }
+            break;
+        case STATE_DELAY_AFTER_BLINK:
+            // Delay for 0.5 second after blink.
+            assert ( pCurrEyeAnimation == &delayAnimation );
+            if (pCurrEyeAnimation->isDone())
+            {
+                eyeState = STATE_START_LOOP;
+                pCurrEyeAnimation = NULL;
+            }
+            break;
+        case STATE_DONE:
+            break;
+        }
 
         // Flash LED1 on mbed to let user knows that nothing has hung.
         if (ledTimer.read_ms() >= 250)
@@ -78,7 +218,7 @@ int main()
     }
 }
 
-static void initAnimation()
+static void initCandleFlicker()
 {
     static FlickerAnimation<LED_COUNT> flicker;
     static FlickerProperties           flickerProperties;
@@ -90,95 +230,12 @@ static void initAnimation()
     flickerProperties.brightnessMax = 255;
     flickerProperties.baseRGBColour = DARK_ORANGE;
     flicker.setProperties(&flickerProperties);
-    g_pPixelUpdate = &flicker;
+    g_pCandleFlicker = &flicker;
 }
 
-// The column bits in the 8x8 matrix array are arranged in a weird fashion.
-// The leftmost bit is in the msb but the next pixel to the right is in the lsb.
-// This means we need to rotate the bits to the right by one.
-#define ROR(X) (((X) >> 1) | (((X) & 1) << 7))
-
-static void testEyes()
+static int random(int low, int high)
 {
-    static Adafruit_8x8matrix matrix = Adafruit_8x8matrix(p9, p10);
-
-    matrix.begin(0x70);
-
-    static const uint8_t smile_bmp[16] =
-      { ROR(0x3C), //B00111100,
-        0x00,
-        ROR(0x42), //B01000010,
-        0x00,
-        ROR(0xA5), //B10100101,
-        0x00,
-        ROR(0x81), //B10000001,
-        0x00,
-        ROR(0xA5), //B10100101,
-        0x00,
-        ROR(0x99), //B10011001,
-        0x00,
-        ROR(0x42), //B01000010,
-        0x00,
-        ROR(0x3C), //B00111100 },
-        0x00 };
-      static const uint8_t neutral_bmp[16] =
-      { ROR(0x3C), //B00111100,
-        0x00,
-        ROR(0x42), //B01000010,
-        0x00,
-        ROR(0xA5), //B10100101,
-        0x00,
-        ROR(0x81), //B10000001,
-        0x00,
-        ROR(0xBD), //B10111101,
-        0x00,
-        ROR(0x81), //B10000001,
-        0x00,
-        ROR(0x42), //B01000010,
-        0x00,
-        ROR(0x3C), //B00111100 };
-        0x00 };
-      static const uint8_t frown_bmp[16] =
-      { ROR(0x3C), //B00111100,
-        0x00,
-        ROR(0x42), //B01000010,
-        0x00,
-        ROR(0xA5), //B10100101,
-        0x00,
-        ROR(0x81), //B10000001,
-        0x00,
-        ROR(0x99), //B10011001,
-        0x00,
-        ROR(0xA5), //B10100101,
-        0x00,
-        ROR(0x42), //B01000010,
-        0x00,
-        ROR(0x3C), //B00111100 };
-        0x00 };
-
-    matrix.clear();
-    memcpy(&matrix.m_displayBuffer[1], smile_bmp, sizeof(matrix.m_displayBuffer)-1);
-    matrix.writeDisplay();
-    wait_ms(1000);
-
-    matrix.clear();
-    memcpy(&matrix.m_displayBuffer[1], neutral_bmp, sizeof(matrix.m_displayBuffer)-1);
-    matrix.writeDisplay();
-    wait_ms(1000);
-
-    matrix.clear();
-    memcpy(&matrix.m_displayBuffer[1], frown_bmp, sizeof(matrix.m_displayBuffer)-1);
-    matrix.writeDisplay();
-    wait_ms(1000);
-
-    for (int y = 0 ; y < 8 ; y++)
-    {
-        for (int x = 0 ; x < 8 ; x++)
-        {
-            matrix.clear();
-            matrix.drawPixel(x, y, LED_ON);
-            matrix.writeDisplay();
-            wait_ms(100);
-        }
-    }
+    assert ( high > low );
+    int delta = high - low + 1;
+    return rand() % delta + low;
 }

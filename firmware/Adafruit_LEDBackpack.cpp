@@ -37,7 +37,7 @@ void Adafruit_LEDBackpack::setBrightness(uint8_t brightness)
         brightness = 15;
 
     char command = HT16K33_CMD_BRIGHTNESS | brightness;
-    m_i2c.write(m_i2cAddress, &command, sizeof(command));
+    m_pI2C->write(m_i2cAddress, &command, sizeof(command));
 }
 
 void Adafruit_LEDBackpack::blinkRate(uint8_t rate)
@@ -47,7 +47,7 @@ void Adafruit_LEDBackpack::blinkRate(uint8_t rate)
         rate = HT16K33_BLINK_OFF;
 
     char command = HT16K33_CMD_BLINK | HT16K33_BLINK_DISPLAYON | (rate << 1);
-    m_i2c.write(m_i2cAddress, &command, sizeof(command));
+    m_pI2C->write(m_i2cAddress, &command, sizeof(command));
 }
 
 void Adafruit_LEDBackpack::begin(uint8_t i2cAddress /* = 0x70 */)
@@ -58,7 +58,7 @@ void Adafruit_LEDBackpack::begin(uint8_t i2cAddress /* = 0x70 */)
     m_i2cAddress = i2cAddress << 1;
 
     char command = HT16K33_CMD_OSCILLATOR_ON;
-    m_i2c.write(m_i2cAddress, &command, sizeof(command));
+    m_pI2C->write(m_i2cAddress, &command, sizeof(command));
 
     blinkRate(HT16K33_BLINK_OFF);
 
@@ -71,7 +71,7 @@ void Adafruit_LEDBackpack::writeDisplay(void)
     // Start at address 0.
     m_displayBuffer[0] = 0x00;
 
-    m_i2c.write(m_i2cAddress, (const char*)m_displayBuffer, sizeof(m_displayBuffer));
+    m_pI2C->write(m_i2cAddress, (const char*)m_displayBuffer, sizeof(m_displayBuffer));
 }
 
 void Adafruit_LEDBackpack::clear(void)
@@ -97,4 +97,14 @@ void Adafruit_8x8matrix::drawPixel(int x, int y, bool color)
         m_displayBuffer[y * 2 + 1] |= (1 << x);
     else
         m_displayBuffer[y * 2 + 1] &= ~(1 << x);
+}
+
+void Adafruit_8x8matrix::drawRow(int row, uint8_t rowData)
+{
+    if (row < 0 || row >= 8)
+        return;
+
+    // The pixels are stored with left most pixel in lsb and rightmost pixel in msb and then rotated right by 1 bit.
+    uint8_t rotatedData = (rowData >> 1) | ((rowData & 1) << 7);
+    m_displayBuffer[row * 2 + 1] = rotatedData;
 }

@@ -45,8 +45,9 @@
 class Adafruit_LEDBackpack
 {
 public:
-    Adafruit_LEDBackpack(PinName sda, PinName scl)  : m_i2c(sda, scl)
+    Adafruit_LEDBackpack(I2C* pI2C)
     {
+        m_pI2C = pI2C;
         clear();
     }
 
@@ -70,7 +71,7 @@ public:
     uint8_t m_displayBuffer[8 * 2 + 1];
 
 protected:
-    I2C     m_i2c;
+    I2C*    m_pI2C;
     uint8_t m_i2cAddress;
 };
 
@@ -78,13 +79,18 @@ protected:
 class Adafruit_8x8matrix : public Adafruit_LEDBackpack
 {
 public:
-    Adafruit_8x8matrix(PinName sda, PinName scl) : Adafruit_LEDBackpack(sda, scl)
+    Adafruit_8x8matrix(I2C* pI2C) : Adafruit_LEDBackpack(pI2C)
     {
     }
 
     // Sets or clears (based on color boolean parameter) the pixel in the display buffer at the desired x/y coordinate.
     // Still need a subsequent call to writeDisplay() to actually send the pixel data to the interal RAM of the HT16K33.
     void drawPixel(int x, int y, bool color);
+
+    // Draws the specified row of 8 pixels to the display row at the desired row. Still need a subsequent call to
+    // writeDisplay() to actually send the pixel data to the internal RAM of the HT16K33. The leftmost pixel for the
+    // row is taken from the lsb of rowData and the right pixel for the row is taken from the msb of rowData.
+    void drawRow(int row, uint8_t rowData);
 };
 
 #endif // Adafruit_LEDBackpack_h
