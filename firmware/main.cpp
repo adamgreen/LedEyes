@@ -30,9 +30,6 @@
 // The number of milliseconds to delay betweenn initial centering of eyes and initial eye wink.
 #define MILLISECONDS_FOR_INITIAL_DELAY      2000
 
-// Utility macros.
-#define ARRAY_SIZE(X) (sizeof(X)/sizeof(X[0]))
-
 
 enum EyeState
 {
@@ -153,8 +150,8 @@ int main()
         case STATE_START_LOOP:
             // Start the main loop of eye movement animations.
             eyeState = STATE_MOVING_EYES;
-            moveEyeAnimation.start(random(EyeMatrices::PupilLimits::MIN, EyeMatrices::PupilLimits::MAX + 1),
-                                   random(EyeMatrices::PupilLimits::MIN, EyeMatrices::PupilLimits::MAX + 1),
+            moveEyeAnimation.start(random(-2, 2),
+                                   random(-2, 2),
                                    50);
             pCurrEyeAnimation = &moveEyeAnimation;
             break;
@@ -163,7 +160,7 @@ int main()
             assert ( pCurrEyeAnimation == &moveEyeAnimation );
             if (pCurrEyeAnimation->isDone())
             {
-                delayAnimation.start(random(5, 7) * 500);
+                delayAnimation.start(random(5, 6) * 500);
                 pCurrEyeAnimation = &delayAnimation;
                 eyeState = STATE_DELAY_AFTER_MOVE;
             }
@@ -173,7 +170,7 @@ int main()
             assert ( pCurrEyeAnimation == &delayAnimation );
             if (pCurrEyeAnimation->isDone())
             {
-                if (random(0, 5) == 0)
+                if (random(0, 4) == 0)
                 {
                     blinkAnimation.start(true, true);
                     pCurrEyeAnimation = &blinkAnimation;

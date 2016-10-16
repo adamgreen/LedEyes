@@ -20,6 +20,22 @@
 #include "Adafruit_LEDBackpack.h"
 
 
+
+struct PupilPosition
+{
+    int x;
+    int y;
+};
+
+struct PupilKeyFrame
+{
+    PupilPosition left;
+    PupilPosition right;
+    uint32_t      frameDelayStart;
+    int32_t       frameDelayStep;
+    bool          interpolate;
+};
+
 class EyeMatrices
 {
 public:
@@ -27,9 +43,11 @@ public:
 
     void init()
     {
-        displayEyes(0, 0);
+        PupilPosition pos = {0, 0};
+        displayEyes(&pos, &pos);
     }
 
+    // UNDONE: Might be able to make these protected or just remove now that I have drawRow.
     Adafruit_8x8matrix* left()
     {
         return &m_leftEye;
@@ -42,28 +60,51 @@ public:
 
     enum PupilLimits
     {
-        MIN = -2,
-        MAX = 2
+        MIN = -5,
+        MAX = 5
     };
 
-    /*
-      This method displays eyeball with pupil offset by X, Y values from center position.
-      Valid X and Y range is [MIN,MAX]
-      Both LED modules will show identical eyes
-    */
-    void displayEyes(int offsetX, int offsetY);
-
-    /*
-      This method corrects provided coordinate value
-    */
-    static int getValidValue(int value)
+    enum PupilEnum
     {
-      if (value > MAX)
-        return MAX;
-      else if (value < MIN)
-        return MIN;
-      else
-        return value;
+        LEFT = 0,
+        RIGHT = 1,
+        PUPIL_COUNT = 2
+    };
+
+    void displayEyes(const PupilPosition* pLeftPos, const PupilPosition* pRightPos);
+
+    void drawRow(PupilEnum pupil, int row, uint8_t rowData)
+    {
+        switch (pupil)
+        {
+        case LEFT:
+            m_leftEye.drawRow(row, rowData);
+            break;
+        case RIGHT:
+            m_rightEye.drawRow(row, rowData);
+            break;
+        default:
+            assert ( pupil == LEFT || pupil == RIGHT );
+            break;
+        }
+    }
+
+    static PupilPosition getValidPupilPosition(const PupilPosition* pPos)
+    {
+        int x = pPos->x;
+        int y = pPos->y;
+        PupilPosition validPos = {x, y};
+
+        if (x > MAX)
+            validPos.x = MAX;
+        else if (x < MIN)
+            validPos.x = MIN;
+
+        if (y > MAX)
+            validPos.y = MAX;
+        else if (y < MIN)
+            validPos.y = MIN;
+        return validPos;
     }
 
     void writeDisplays()
@@ -77,9 +118,9 @@ public:
         return m_timer.read_ms();
     }
 
-    uint8_t            m_eyeCurrent[8];
-    int                m_currentX;
-    int                m_currentY;
+    // UNDONE: Can I make m_eyeCurrent protected?
+    uint8_t            m_eyeCurrent[PUPIL_COUNT][8];
+    PupilPosition      m_currentPos[PUPIL_COUNT];
 protected:
     Adafruit_8x8matrix m_leftEye;
     Adafruit_8x8matrix m_rightEye;
@@ -185,18 +226,19 @@ protected:
 };
 
 
-class MoveEyeAnimation : public EyeAnimationBase
+
+class PupilAnimation : public EyeAnimationBase
 {
 public:
-    MoveEyeAnimation(EyeMatrices* pEyes) : EyeAnimationBase(pEyes)
+    PupilAnimation(EyeMatrices* pEyes) : EyeAnimationBase(pEyes)
     {
         m_isDone = true;
     }
-    ~MoveEyeAnimation()
+    ~PupilAnimation()
     {
     }
 
-    void start(int newX, int newY, uint32_t stepDelay);
+    void start(const PupilKeyFrame* pKeyFrames, size_t keyFrameCount);
     virtual void run();
 
     virtual bool isDone()
@@ -205,14 +247,33 @@ public:
     }
 
 protected:
-    uint32_t    m_stepDelay;
-    int         m_startX;
-    int         m_startY;
-    int         m_dirX;
-    int         m_dirY;
-    int         m_steps;
-    float       m_changeX;
-    float       m_changeY;
-    int         m_index;
-    bool        m_isDone;
+    void startNextFrame();
+
+    const PupilKeyFrame* m_pFirstKeyFrame;
+    const PupilKeyFrame* m_pLastKeyFrame;
+    const PupilKeyFrame* m_pCurrKeyFrame;
+    PupilPosition        m_startPos[EyeMatrices::PUPIL_COUNT];
+    int                  m_index;
+    int                  m_steps;
+    uint32_t             m_frameDelay;
+    int32_t              m_frameDelayStep;
+    float                m_changeX[EyeMatrices::PUPIL_COUNT];
+    float                m_changeY[EyeMatrices::PUPIL_COUNT];
+    bool                 m_isDone;
+};
+
+class MoveEyeAnimation : public PupilAnimation
+{
+public:
+    MoveEyeAnimation(EyeMatrices* pEyes) : PupilAnimation(pEyes)
+    {
+    }
+    ~MoveEyeAnimation()
+    {
+    }
+
+    void start(int newX, int newY, uint32_t stepDelay);
+
+protected:
+    PupilKeyFrame m_keyFrames[1];
 };
