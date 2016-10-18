@@ -78,10 +78,8 @@ int main()
     uint32_t             lastSetCount = 0;
     uint32_t             loopCounter = 0;
     EyeEffects           effectCounter = (EyeEffects)0;
-    static   DigitalOut  myled(LED1);
     static   NeoPixel    ledControl(LED_COUNT, p11);
     static   Timer       timer;
-    static   Timer       ledTimer;
     static   I2C         i2cEyeMatrices(p9, p10);
     static   EyeMatrices eyes(&i2cEyeMatrices, LEFT_EYE_I2C_ADDRESS, RIGHT_EYE_I2C_ADDRESS);
     EyeState             eyeState = STATE_INIT;
@@ -98,10 +96,7 @@ int main()
 
     initCandleFlicker();
     ledControl.start();
-
     timer.start();
-    ledTimer.start();
-
     while(1)
     {
         if (SECONDS_BETWEEN_COUNTER_DUMPS > 0 && timer.read_ms() > SECONDS_BETWEEN_COUNTER_DUMPS * 1000)
@@ -130,6 +125,7 @@ int main()
         case STATE_INIT:
             // Center the eyes to initialize the state.
             // Start the delay timer before transitioning to the next state.
+            i2cEyeMatrices.frequency(400000);
             eyes.init();
             delayAnimation.start(MILLISECONDS_FOR_INITIAL_DELAY);
             pCurrEyeAnimation = &delayAnimation;
@@ -338,13 +334,6 @@ int main()
         case STATE_DONE:
             break;
         }
-
-        // Flash LED1 on mbed to let user know that nothing has hung.
-        if (ledTimer.read_ms() >= 250)
-        {
-            myled = !myled;
-            ledTimer.reset();
-        }
     }
 }
 
@@ -356,8 +345,8 @@ static void initCandleFlicker()
     flickerProperties.timeMin = 5;
     flickerProperties.timeMax = 250;
     flickerProperties.stayBrightFactor = 5;
-    flickerProperties.brightnessMin = 140;
-    flickerProperties.brightnessMax = 255;
+    flickerProperties.brightnessMin = 128;
+    flickerProperties.brightnessMax = 200;
     flickerProperties.baseRGBColour = DARK_ORANGE;
     flicker.setProperties(&flickerProperties);
     g_pCandleFlicker = &flicker;
