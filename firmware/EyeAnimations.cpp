@@ -110,6 +110,20 @@ void EyeMatrices::displayEyes(const PupilPosition* pLeftPos, const PupilPosition
     writeDisplays();
 }
 
+void EyeMatrices::turnRowOffTemporarily(PupilEnum pupil, int row)
+{
+    Adafruit_8x8matrix* pEye = eye(pupil);
+    assert ( row >= 0 && row < 8 );
+    pEye->drawRow(row, 0);
+}
+
+void EyeMatrices::restoreRow(PupilEnum pupil, int row)
+{
+    Adafruit_8x8matrix* pEye = eye(pupil);
+    assert ( row >= 0 && row < 8 );
+    pEye->drawRow(row, m_eyeCurrent[pupil][row]);
+}
+
 
 
 void BlinkAnimation::start(bool leftBlink /* = true */, bool rightBlink /* = true */)
@@ -142,13 +156,13 @@ void BlinkAnimation::run()
     case EYE_CLOSING:
         if (m_leftBlink)
         {
-            m_pEyes->left()->drawRow(m_index, 0);
-            m_pEyes->left()->drawRow(7-m_index, 0);
+            m_pEyes->turnRowOffTemporarily(EyeMatrices::LEFT, m_index);
+            m_pEyes->turnRowOffTemporarily(EyeMatrices::LEFT, 7-m_index);
         }
         if (m_rightBlink)
         {
-            m_pEyes->right()->drawRow(m_index, 0);
-            m_pEyes->right()->drawRow(7-m_index, 0);
+            m_pEyes->turnRowOffTemporarily(EyeMatrices::RIGHT, m_index);
+            m_pEyes->turnRowOffTemporarily(EyeMatrices::RIGHT, 7-m_index);
         }
         m_pEyes->writeDisplays();
 
@@ -164,13 +178,13 @@ void BlinkAnimation::run()
     case EYE_OPENING:
         if (m_leftBlink)
         {
-            m_pEyes->left()->drawRow(m_index, m_pEyes->m_eyeCurrent[EyeMatrices::LEFT][m_index]);
-            m_pEyes->left()->drawRow(7-m_index, m_pEyes->m_eyeCurrent[EyeMatrices::LEFT][7-m_index]);
+            m_pEyes->restoreRow(EyeMatrices::LEFT, m_index);
+            m_pEyes->restoreRow(EyeMatrices::LEFT, 7-m_index);
         }
         if (m_rightBlink)
         {
-            m_pEyes->right()->drawRow(m_index, m_pEyes->m_eyeCurrent[EyeMatrices::RIGHT][m_index]);
-            m_pEyes->right()->drawRow(7-m_index, m_pEyes->m_eyeCurrent[EyeMatrices::RIGHT][7-m_index]);
+            m_pEyes->restoreRow(EyeMatrices::RIGHT, m_index);
+            m_pEyes->restoreRow(EyeMatrices::RIGHT, 7-m_index);
         }
         m_pEyes->writeDisplays();
 
@@ -215,8 +229,8 @@ void PupilAnimation::startNextFrame()
     assert ( m_pCurrKeyFrame < m_pLastKeyFrame );
 
     // Start each eye's pupil out at its current position.
-    m_startPos[EyeMatrices::LEFT] = m_pEyes->m_currentPos[EyeMatrices::LEFT];
-    m_startPos[EyeMatrices::RIGHT] = m_pEyes->m_currentPos[EyeMatrices::RIGHT];
+    m_startPos[EyeMatrices::LEFT] = m_pEyes->getPupilPos(EyeMatrices::LEFT);
+    m_startPos[EyeMatrices::RIGHT] = m_pEyes->getPupilPos(EyeMatrices::RIGHT);
 
     // Target positions for each eye's pupil after fixup for out of range offsets.
     PupilPosition newPos[EyeMatrices::PUPIL_COUNT];
@@ -636,8 +650,7 @@ void GlowEyesAnimation::run()
     switch (m_state)
     {
     case BRIGHTER:
-        m_pEyes->left()->setBrightness(m_brightness);
-        m_pEyes->right()->setBrightness(m_brightness);
+        m_pEyes->setBrightness(m_brightness);
 
         delay = 50;
         m_brightness++;
@@ -650,8 +663,7 @@ void GlowEyesAnimation::run()
         startDelay(delay);
         break;
     case DARKER:
-        m_pEyes->left()->setBrightness(m_brightness);
-        m_pEyes->right()->setBrightness(m_brightness);
+        m_pEyes->setBrightness(m_brightness);
 
         delay = 25;
         m_brightness--;

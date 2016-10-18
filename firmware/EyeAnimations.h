@@ -60,6 +60,22 @@ struct PupilKeyFrame
 class EyeMatrices
 {
 public:
+    // The limits of the offsets that can be used for the location of pupils. It should be noted that when placed at the
+    // far limits, the pupils will disappear.
+    enum PupilLimits
+    {
+        MIN = -5,
+        MAX = 5
+    };
+
+    // There are two pupils: left and right.
+    enum PupilEnum
+    {
+        LEFT = 0,
+        RIGHT = 1,
+        PUPIL_COUNT = 2
+    };
+
     // Constructor - Initializes the 8x8 matrices on the I2C bus and sets the brightness to its lowest setting for both.
     //  pI2C is a pointer to the mbed I2C bus object to which both of the matrices have been attached.
     //  leftEyeAddress is the 7-bit I2C address of the 8x8 matrix to be used for the left eye.
@@ -73,34 +89,6 @@ public:
         displayEyes(&pos, &pos);
     }
 
-    // Returns a pointer to the driver object for the left 8x8 eye matrix.
-    Adafruit_8x8matrix* left()
-    {
-        return &m_leftEye;
-    }
-
-    // Returns a pointer to the driver object for the right 8x8 eye matrix.
-    Adafruit_8x8matrix* right()
-    {
-        return &m_rightEye;
-    }
-
-    // The limits of the offsets that can be used for the location of pupils. It should be noted that when placed at the
-    // far limits, the pupils will disappear.
-    enum PupilLimits
-    {
-        MIN = -5,
-        MAX = 5
-    };
-
-    // There are two pupil: left and right.
-    enum PupilEnum
-    {
-        LEFT = 0,
-        RIGHT = 1,
-        PUPIL_COUNT = 2
-    };
-
     // Display the eyes with each pupil located at the designated position.
     //  pLeftPos is a pointer to the struct representing the x,y coordinates of the left eye. (0,0) is centered,
     //           (-2,-2) is the lower left corner, and (2, 2) is the upper right corner.
@@ -108,27 +96,25 @@ public:
     //           (-2,-2) is the lower left corner, and (2, 2) is the upper right corner.
     void displayEyes(const PupilPosition* pLeftPos, const PupilPosition* pRightPos);
 
-    // Low level function for setting individual pixels on the specified row of a particular eye matrix.
-    // Should call writeDisplays() later to have the row updates sent to the matrices to be rendered.
-    //  pupil is either EyeMatrices::LEFT or EyeMatrices::RIGHT.
-    //  row is the row of the 8x8 matrix to be updated. Allowed values are 0 to 7.
-    //  rowData is an 8-bit value representing the state for each of the 8 pixels in the specified row. The least
-    //          significant bit represents the leftmost pixel and the most significant bit represents the rightmost
-    //          pixel. A bit value of 1 turns the pixel on and a value of 0 turns it off.
-    void drawRow(PupilEnum pupil, int row, uint8_t rowData)
+    // Temporarily turns off all pixels in a single row of the specified eye matrix.
+    // This is useful for eye wink animations. The previous state of the row is still remembered and can be restored via
+    // a call to the restoreRow() method.
+    //  pupil specifies the eye to be updated. Allowed values are EyeMatrices::LEFT or EyeMatrices::RIGHT.
+    //  row specifies the row for which all pixels should be temporarily turned off. Allowed values are between
+    //      0 and 7.
+    void turnRowOffTemporarily(PupilEnum pupil, int row);
+
+    // Restores a row of pixels that have previously been turned off via a call to the turnRowOffTemporarily() method.
+    //  pupil specifies the eye to be updated. Allowed values are EyeMatrices::LEFT or EyeMatrices::RIGHT.
+    //  row specifies the row for which all pixels should be restored. Allowed values are between 0 and 7.
+    void restoreRow(PupilEnum pupil, int row);
+
+    // Sets the brightness of both eye matrices to the same value.
+    //  brightness is the desired brightness. Allowed values are between 0 (BRIGHTNESS_MIN) and 15 (BRIGHTNESS_MAX).
+    void setBrightness(uint8_t brightness)
     {
-        switch (pupil)
-        {
-        case LEFT:
-            m_leftEye.drawRow(row, rowData);
-            break;
-        case RIGHT:
-            m_rightEye.drawRow(row, rowData);
-            break;
-        default:
-            assert ( pupil == LEFT || pupil == RIGHT );
-            break;
-        }
+        left()->setBrightness(brightness);
+        right()->setBrightness(brightness);
     }
 
     // Validates the x, y coordinates and caps them at the allowed [-5, 5] limits.
@@ -161,15 +147,76 @@ public:
         m_rightEye.writeDisplay();
     }
 
-    // Retrieve the current value of the 32-bit millisecond counter.
+    // Returns the current value of the 32-bit millisecond counter.
     uint32_t getCurrentTime()
     {
         return m_timer.read_ms();
     }
 
+    // Returns the current pupil position for the specified eye.
+    //  pupil specifies which eye location is desired. Allowed values are EyeMatrices::LEFT or EyeMatrices::RIGHT.
+    PupilPosition getPupilPos(PupilEnum pupil)
+    {
+        return m_currentPos[pupil];
+    }
+
+
+protected:
+    // Returns a pointer to the driver object for the left 8x8 eye matrix.
+    Adafruit_8x8matrix* left()
+    {
+        return &m_leftEye;
+    }
+
+    // Returns a pointer to the driver object for the right 8x8 eye matrix.
+    Adafruit_8x8matrix* right()
+    {
+        return &m_rightEye;
+    }
+
+    // Returns a pointer to the driver object for the requested eye matrix.
+    //  pupil specifies which matrix should be returned. Allowed values are LEFT or RIGHT.
+    Adafruit_8x8matrix* eye(PupilEnum pupil)
+    {
+        switch (pupil)
+        {
+        case LEFT:
+            return left();
+            break;
+        case RIGHT:
+            return right();
+            break;
+        default:
+            assert ( pupil == LEFT || pupil == RIGHT );
+            return NULL;
+        }
+    }
+
+    // Low level function for setting individual pixels on the specified row of a particular eye matrix.
+    // Should call writeDisplays() later to have the row updates sent to the matrices to be rendered.
+    //  pupil is either EyeMatrices::LEFT or EyeMatrices::RIGHT.
+    //  row is the row of the 8x8 matrix to be updated. Allowed values are 0 to 7.
+    //  rowData is an 8-bit value representing the state for each of the 8 pixels in the specified row. The least
+    //          significant bit represents the leftmost pixel and the most significant bit represents the rightmost
+    //          pixel. A bit value of 1 turns the pixel on and a value of 0 turns it off.
+    void drawRow(PupilEnum pupil, int row, uint8_t rowData)
+    {
+        switch (pupil)
+        {
+        case LEFT:
+            m_leftEye.drawRow(row, rowData);
+            break;
+        case RIGHT:
+            m_rightEye.drawRow(row, rowData);
+            break;
+        default:
+            assert ( pupil == LEFT || pupil == RIGHT );
+            break;
+        }
+    }
+
     uint8_t            m_eyeCurrent[PUPIL_COUNT][8];
     PupilPosition      m_currentPos[PUPIL_COUNT];
-protected:
     Adafruit_8x8matrix m_leftEye;
     Adafruit_8x8matrix m_rightEye;
     Timer              m_timer;
