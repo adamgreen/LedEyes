@@ -45,7 +45,9 @@ EyeMatrices::EyeMatrices(I2C* pI2C, uint8_t leftEyeAddress /* = 0x70 */, uint8_t
 {
     // Initialize the LED eye matrices.
     m_leftEye.begin(leftEyeAddress);
+    m_leftEye.setBrightness(0);
     m_rightEye.begin(rightEyeAddress);
+    m_rightEye.setBrightness(0);
     m_timer.start();
 }
 
@@ -72,7 +74,7 @@ void EyeMatrices::displayEyes(const PupilPosition* pLeftPos, const PupilPosition
         if (x > 0)
             pupilRow[pupil] = (g_eyePupil << x) | ((1 << x) - 1);
         else if (x < 0)
-            pupilRow[pupil] = (g_eyePupil >> -x) | (((1 << -x) - 1) << (8 + x));
+            pupilRow[pupil] = ((int8_t)g_eyePupil >> -x);
 
         // pupil row cannot have 1s where eyeBall has 0s
         if (row1[pupil] >= 0 && row1[pupil] <= 7)
@@ -213,7 +215,8 @@ void PupilAnimation::startNextFrame()
     assert ( m_pCurrKeyFrame < m_pLastKeyFrame );
 
     // Start each eye's pupil out at its current position.
-    memcpy(m_startPos, m_pEyes->m_currentPos, sizeof(m_startPos));
+    m_startPos[EyeMatrices::LEFT] = m_pEyes->m_currentPos[EyeMatrices::LEFT];
+    m_startPos[EyeMatrices::RIGHT] = m_pEyes->m_currentPos[EyeMatrices::RIGHT];
 
     // Target positions for each eye's pupil after fixup for out of range offsets.
     PupilPosition newPos[EyeMatrices::PUPIL_COUNT];
@@ -260,10 +263,10 @@ void PupilAnimation::startNextFrame()
             m_changeY[pupil] = -m_changeY[pupil];
     }
 
-    // Start at the 0th step.
-    m_index = 0;
+    // Start at the first step.
+    m_index = 1;
 
-    // Remember the amount step delays for the current frame to use in run() method.
+    // Remember the step delays for the current frame to use in run() method.
     m_frameDelay = m_pCurrKeyFrame->frameDelayStart;
     m_frameDelayStep = m_pCurrKeyFrame->frameDelayStep;
 }
@@ -274,8 +277,8 @@ void PupilAnimation::run()
     if (!isDelayDone() || isDone())
         return;
 
-    assert ( m_index <= m_steps );
-    if (m_index >= m_steps)
+    assert ( m_index <= m_steps + 1 );
+    if (m_index > m_steps)
     {
         // Have animated to the current key frame so advance to the next one.
         m_pCurrKeyFrame++;
@@ -308,13 +311,369 @@ void PupilAnimation::run()
 
 void MoveEyeAnimation::start(int newX, int newY, uint32_t stepDelay)
 {
-    m_keyFrames[0].left.x = newX;
-    m_keyFrames[0].left.y = newY;
-    m_keyFrames[0].right.x = newX;
-    m_keyFrames[0].right.y = newY;
+    m_keyFrames[0].left.x = m_keyFrames[0].right.x = newX;
+    m_keyFrames[0].left.y = m_keyFrames[0].right.y = newY;
     m_keyFrames[0].frameDelayStart = stepDelay;
     m_keyFrames[0].frameDelayStep = 0;
     m_keyFrames[0].interpolate = true;
 
     PupilAnimation::start(m_keyFrames, ARRAY_SIZE(m_keyFrames));
+}
+
+
+
+void CrossEyesAnimation::start()
+{
+    // Move eyes to center position first.
+    m_keyFrames[0].left.x = m_keyFrames[0].right.x = 0;
+    m_keyFrames[0].left.y = m_keyFrames[0].right.y = 0;
+    m_keyFrames[0].frameDelayStart = 50;
+    m_keyFrames[0].frameDelayStep = 0;
+    m_keyFrames[0].interpolate = true;
+    // Delay and stay at center position for half a second.
+    m_keyFrames[1].left.x = m_keyFrames[1].right.x = 0;
+    m_keyFrames[1].left.y = m_keyFrames[1].right.y = 0;
+    m_keyFrames[1].frameDelayStart = 500;
+    m_keyFrames[1].frameDelayStep = 0;
+    m_keyFrames[1].interpolate = false;
+    // Have each eye look in towards the nose.
+    m_keyFrames[2].left.x = 2;
+    m_keyFrames[2].left.y = 0;
+    m_keyFrames[2].right.x = -2;
+    m_keyFrames[2].right.y = 0;
+    m_keyFrames[2].frameDelayStart = 100;
+    m_keyFrames[2].frameDelayStep = 0;
+    m_keyFrames[2].interpolate = true;
+    // Delay and stay in crossed state for 2 seconds.
+    m_keyFrames[3].left.x = 2;
+    m_keyFrames[3].left.y = 0;
+    m_keyFrames[3].right.x = -2;
+    m_keyFrames[3].right.y = 0;
+    m_keyFrames[3].frameDelayStart = 2000;
+    m_keyFrames[3].frameDelayStep = 0;
+    m_keyFrames[3].interpolate = false;
+    // Move eyes out to center position again.
+    m_keyFrames[4].left.x = m_keyFrames[4].right.x = 0;
+    m_keyFrames[4].left.y = m_keyFrames[4].right.y = 0;
+    m_keyFrames[4].frameDelayStart = 100;
+    m_keyFrames[4].frameDelayStep = 0;
+    m_keyFrames[4].interpolate = true;
+
+    PupilAnimation::start(m_keyFrames, ARRAY_SIZE(m_keyFrames));
+}
+
+
+
+void RoundSpinAnimation::start()
+{
+    int i = 0;
+
+    // Move eyes to center position first.
+    m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+    m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+    m_keyFrames[i].frameDelayStart = 50;
+    m_keyFrames[i].frameDelayStep = 0;
+    m_keyFrames[i].interpolate = true;
+    i++;
+
+    // Delay and stay at center position for half a second.
+    m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+    m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+    m_keyFrames[i].frameDelayStart = 500;
+    m_keyFrames[i].frameDelayStep = 0;
+    m_keyFrames[i].interpolate = false;
+    i++;
+
+    for (int j = 0 ; j < ROUND_SPIN_ITERATIONS; j++)
+    {
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 2;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = -1;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == 0) ? 40 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 1;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = -2;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == 0) ? 30 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = -2;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == 0) ? 20 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = -1;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = -2;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == 0) ? 10 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = -2;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = -1;
+        m_keyFrames[i].frameDelayStart = 40;
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = -2;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+        m_keyFrames[i].frameDelayStart = 40;
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = -2;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 1;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == ROUND_SPIN_ITERATIONS - 1) ? 10 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = -1;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 2;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == ROUND_SPIN_ITERATIONS - 1) ? 20 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 2;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == ROUND_SPIN_ITERATIONS - 1) ? 30 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 1;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 2;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == ROUND_SPIN_ITERATIONS - 1) ? 40 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 2;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 1;
+        m_keyFrames[i].frameDelayStart = 40 + ((j == ROUND_SPIN_ITERATIONS - 1) ? 50 : 0);
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 2;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+        m_keyFrames[i].frameDelayStart = 40;
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+    }
+
+    PupilAnimation::start(m_keyFrames, ARRAY_SIZE(m_keyFrames));
+}
+
+
+
+
+void CrazySpinAnimation::start()
+{
+    int i = 0;
+
+    // Move eyes to center position first.
+    m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+    m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+    m_keyFrames[i].frameDelayStart = 50;
+    m_keyFrames[i].frameDelayStep = 0;
+    m_keyFrames[i].interpolate = true;
+    i++;
+
+    // Delay and stay at center position for half a second.
+    m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+    m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+    m_keyFrames[i].frameDelayStart = 500;
+    m_keyFrames[i].frameDelayStep = 0;
+    m_keyFrames[i].interpolate = false;
+    i++;
+
+    for (int j = 0 ; j < CRAZY_SPIN_ITERATIONS; j++)
+    {
+        // Scroll the pupil off screen to the left.
+        // Start slow on first iteration and then accelerate to final speed.
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = -5;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+        m_keyFrames[i].frameDelayStart = (j == 0) ? 100 : 50;
+        m_keyFrames[i].frameDelayStep = (j == 0) ? -10 : 0;
+        m_keyFrames[i].interpolate = true;
+        i++;
+
+        // Jump from left side off of screen to right side off of screen.
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 5;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+        m_keyFrames[i].frameDelayStart = 0;
+        m_keyFrames[i].frameDelayStep = 0;
+        m_keyFrames[i].interpolate = false;
+        i++;
+
+        // Scroll the pupil from offscreen right to the center.
+        // Decelerate the pupils on the last iteration.
+        m_keyFrames[i].left.x = m_keyFrames[i].right.x = 0;
+        m_keyFrames[i].left.y = m_keyFrames[i].right.y = 0;
+        m_keyFrames[i].frameDelayStart = 50;
+        m_keyFrames[i].frameDelayStep = (j == CRAZY_SPIN_ITERATIONS - 1) ? 10 : 0;
+        m_keyFrames[i].interpolate = true;
+        i++;
+    }
+
+    PupilAnimation::start(m_keyFrames, ARRAY_SIZE(m_keyFrames));
+}
+
+
+
+void MethEyesAnimation::start()
+{
+    // Move eyes to center position first.
+    m_keyFrames[0].left.x = m_keyFrames[0].right.x = 0;
+    m_keyFrames[0].left.y = m_keyFrames[0].right.y = 0;
+    m_keyFrames[0].frameDelayStart = 50;
+    m_keyFrames[0].frameDelayStep = 0;
+    m_keyFrames[0].interpolate = true;
+    // Delay and stay at center position for half a second.
+    m_keyFrames[1].left.x = m_keyFrames[1].right.x = 0;
+    m_keyFrames[1].left.y = m_keyFrames[1].right.y = 0;
+    m_keyFrames[1].frameDelayStart = 500;
+    m_keyFrames[1].frameDelayStep = 0;
+    m_keyFrames[1].interpolate = false;
+    // Have each eye look aways from the nose.
+    m_keyFrames[2].left.x = -2;
+    m_keyFrames[2].left.y = 0;
+    m_keyFrames[2].right.x = 2;
+    m_keyFrames[2].right.y = 0;
+    m_keyFrames[2].frameDelayStart = 100;
+    m_keyFrames[2].frameDelayStep = 0;
+    m_keyFrames[2].interpolate = true;
+    // Delay and stay in meth state for 2 seconds.
+    m_keyFrames[3].left.x = -2;
+    m_keyFrames[3].left.y = 0;
+    m_keyFrames[3].right.x = 2;
+    m_keyFrames[3].right.y = 0;
+    m_keyFrames[3].frameDelayStart = 2000;
+    m_keyFrames[3].frameDelayStep = 0;
+    m_keyFrames[3].interpolate = false;
+    // Move eyes out to center position again.
+    m_keyFrames[4].left.x = m_keyFrames[4].right.x = 0;
+    m_keyFrames[4].left.y = m_keyFrames[4].right.y = 0;
+    m_keyFrames[4].frameDelayStart = 100;
+    m_keyFrames[4].frameDelayStep = 0;
+    m_keyFrames[4].interpolate = true;
+
+    PupilAnimation::start(m_keyFrames, ARRAY_SIZE(m_keyFrames));
+}
+
+
+
+void LazyEyeAnimation::start()
+{
+    // Move eyes to look up a bit.
+    m_keyFrames[0].left.x = m_keyFrames[0].right.x = 0;
+    m_keyFrames[0].left.y = m_keyFrames[0].right.y = 1;
+    m_keyFrames[0].frameDelayStart = 50;
+    m_keyFrames[0].frameDelayStep = 0;
+    m_keyFrames[0].interpolate = true;
+    // Delay and stay at center position for half a second.
+    m_keyFrames[1].left.x = m_keyFrames[1].right.x = 0;
+    m_keyFrames[1].left.y = m_keyFrames[1].right.y = 1;
+    m_keyFrames[1].frameDelayStart = 500;
+    m_keyFrames[1].frameDelayStep = 0;
+    m_keyFrames[1].interpolate = false;
+    // Have right eye only look down slowly.
+    m_keyFrames[2].left.x = 0;
+    m_keyFrames[2].left.y = 1;
+    m_keyFrames[2].right.x = 0;
+    m_keyFrames[2].right.y = -2;
+    m_keyFrames[2].frameDelayStart = 150;
+    m_keyFrames[2].frameDelayStep = 0;
+    m_keyFrames[2].interpolate = true;
+    // Delay and stay in last state for 1 second2.
+    m_keyFrames[3].left.x = 0;
+    m_keyFrames[3].left.y = 1;
+    m_keyFrames[3].right.x = 0;
+    m_keyFrames[3].right.y = -2;
+    m_keyFrames[3].frameDelayStart = 1000;
+    m_keyFrames[3].frameDelayStep = 0;
+    m_keyFrames[3].interpolate = false;
+    // Move eyes out to center position again at a quick rate.
+    m_keyFrames[4].left.x = m_keyFrames[4].right.x = 0;
+    m_keyFrames[4].left.y = m_keyFrames[4].right.y = 1;
+    m_keyFrames[4].frameDelayStart = 25;
+    m_keyFrames[4].frameDelayStep = 0;
+    m_keyFrames[4].interpolate = true;
+
+    PupilAnimation::start(m_keyFrames, ARRAY_SIZE(m_keyFrames));
+}
+
+
+
+void GlowEyesAnimation::start(int iterations)
+{
+    m_iterations = iterations;
+
+    // Start the eye(s) closing on the next call to run().
+    m_isDone = false;
+    m_state = BRIGHTER;
+    m_brightness = 0;
+    startDelay(0);
+}
+
+void GlowEyesAnimation::run()
+{
+    // Just return if the animation is still waiting for a delay between frames.
+    if (!isDelayDone())
+        return;
+
+    int delay = 0;
+    switch (m_state)
+    {
+    case BRIGHTER:
+        m_pEyes->left()->setBrightness(m_brightness);
+        m_pEyes->right()->setBrightness(m_brightness);
+
+        delay = 50;
+        m_brightness++;
+        if (m_brightness > 15)
+        {
+            m_state = DARKER;
+            m_brightness = 15;
+            delay += 250;
+        }
+        startDelay(delay);
+        break;
+    case DARKER:
+        m_pEyes->left()->setBrightness(m_brightness);
+        m_pEyes->right()->setBrightness(m_brightness);
+
+        delay = 25;
+        m_brightness--;
+        if (m_brightness < 0)
+        {
+            m_iterations--;
+            if (m_iterations < 1)
+            {
+                m_state = DONE;
+            }
+            else
+            {
+                m_state = BRIGHTER;
+            }
+
+            m_brightness = 0;
+            delay += 150;
+        }
+        startDelay(delay);
+        break;
+    case DONE:
+        m_isDone = true;
+        break;
+    }
 }
