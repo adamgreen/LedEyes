@@ -1,0 +1,10 @@
+{{https://github.com/adamgreen/LedEyes/blob/master/images/20161017-01.gif}}\\
+
+My mbed based reimagining of Michal Janyst's Arduino Pumpkin Eyes project.
+
+==Important Links!
+[[http://hackaday.com/2014/10/27/8x8-led-arrays-make-for-one-creepy-animated-pumpkin/ | Hackaday Article]]\\
+[[http://mjanyst.weebly.com/arduino-pumpkin-eyes.html | Michal T Janyst's Original Project Page]]\\
+[[https://www.youtube.com/watch?v=e3O-ti5n6jw | YouTube Video of Michal T Janyst's Original Project]]\\
+[[https://www.adafruit.com/products/1463 | Adafruit NeoPixel Ring Product Page]]\\
+[[https://www.adafruit.com/products/1050 | Adafruit 8x8 LED Matrix Product Page]]\\
