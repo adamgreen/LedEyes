@@ -1,10 +1,56 @@
-{{https://github.com/adamgreen/LedEyes/blob/master/images/20161017-01.gif}}\\
+{{https://github.com/adamgreen/LedEyes/blob/master/images/20161205-01.gif}}\\
 
-My mbed based reimagining of Michal Janyst's Arduino Pumpkin Eyes project.
+My mbed based reimagining of Michal Janyst's Arduino Pumpkin Eyes project. It plays the same eye animations as Michael's
+original version but has a few modifications to the source code:
+* Ported to run on the [[https://developer.mbed.org/platforms/mbed-LPC1768/ | mbed LPC1768]].
+* Ported to use the [[https://www.adafruit.com/products/1854 | Holek HT16K33 based 8x8 LED matrices from Adafruit]]
+  instead of the MAX7219 based LED matrices in the original.
+* Added an [[https://www.adafruit.com/products/1463 | Adafruit NeoPixel Ring]] and used it to simulate a flickering
+  candle within the pumpkin.
+* Made the various eye animations into C++ classes, sharing a common interface.
+* The eye animations now run as state machines so that they can easily run concurrently with the Neopixel candle
+  animation which was already state machine based.
+* Many of the eye animations now take advantage of a more generic keyframe based pupil animation class to reduce code
+  redundancy.
+
+I also diverged from the original design by making round eye holes in the pumpkin and placing the square LED matrices
+behind these holes to hide the unused pixels in the corner of the matrices.
+
+
 
 ==Important Links!
 [[http://hackaday.com/2014/10/27/8x8-led-arrays-make-for-one-creepy-animated-pumpkin/ | Hackaday Article]]\\
 [[http://mjanyst.weebly.com/arduino-pumpkin-eyes.html | Michal T Janyst's Original Project Page]]\\
 [[https://www.youtube.com/watch?v=e3O-ti5n6jw | YouTube Video of Michal T Janyst's Original Project]]\\
+[[http://www.pumpkinlady.com/product/earl/ | The Pumpkin Lady's Earl Pumpkin Carving Pattern]]\\
 [[https://www.adafruit.com/products/1463 | Adafruit NeoPixel Ring Product Page]]\\
 [[https://www.adafruit.com/products/1854 | Adafruit 8x8 LED Matrix Product Page]]\\
+[[https://github.com/adamgreen/NeoPixelTree#ws2812-driver | My SPI based NeoPixel Driver]]\\
+
+
+
+==Electronics
+{{https://github.com/adamgreen/LedEyes/blob/master/images/20161205-02.jpg}}\\
+The electronic components were soldered to a basic prototyping board. Even the
+[[https://www.adafruit.com/products/1463 | Adafruit NeoPixel Ring]] was soldered directly to the board, above the other
+electronics so that nothing obstructed its illumination of the pumpkin. It has 3 male headers for connection to external
+components:
+* 1 x 2-pin header for connection to a DC barrel jack that was hot glued into the back of the pumpkin.
+* 2 x 4-pin headers for connection to the two
+  [[https://www.adafruit.com/products/1854 | I2C based Adafruit 8x8 LED matrices]]. The 4 wire cable connecting these
+  matrices to the main PCB have the following mapping:
+|= Wire Colour |= Signal Name |= mbed Pin |
+| Blue         | SCL          | p10       |
+| Green        | SDA          | p9        |
+| Yellow       | Ground       | Gnd       |
+| Orange       | 5V           | Vin       |
+
+Both of the 8x8 LED matrices are connected to the same I2C bus but have different addresses. The left eye uses a matrix
+which has been set to the default address of 0x70. The right eye uses a matrix which has been modified to use an address
+of 0x71. The was done by shorting the A0 pads on the controller as documented
+[[https://learn.adafruit.com/adafruit-led-backpack/changing-i2c-address | here.]]
+\\
+\\
+{{https://raw.githubusercontent.com/adamgreen/LedEyes/master/hardware/Schematic.png}}\\
+[[https://github.com/adamgreen/LedEyes/blob/master/hardware/Schematic.pdf | PDF of schematic]]\\
+[[https://github.com/adamgreen/LedEyes/blob/master/hardware/Pumpkin.sch | Eagle CAD schematic]]
