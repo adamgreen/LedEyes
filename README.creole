@@ -1,6 +1,6 @@
 {{https://github.com/adamgreen/LedEyes/blob/master/images/20161205-01.gif}}\\
 
-My mbed based reimagining of Michal Janyst's Arduino Pumpkin Eyes project. It plays the same eye animations as Michael's
+My mbed based reimagining of Michal Janyst's Arduino Pumpkin Eyes project. It plays the same eye animations as Michal's
 original version but has a few modifications to the source code:
 * Ported to run on the [[https://developer.mbed.org/platforms/mbed-LPC1768/ | mbed LPC1768]].
 * Ported to use the [[https://www.adafruit.com/products/1854 | Holek HT16K33 based 8x8 LED matrices from Adafruit]]
