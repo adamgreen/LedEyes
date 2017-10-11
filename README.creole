@@ -1,4 +1,6 @@
-{{https://github.com/adamgreen/LedEyes/blob/master/images/20161205-01.gif}}\\
+{{https://github.com/adamgreen/LedEyes/blob/master/images/20161205-01.gif}}
+{{https://github.com/adamgreen/LedEyes/blob/master/images/20171010-01.gif}}
+\\
 
 My mbed based reimagining of Michal Janyst's Arduino Pumpkin Eyes project. It plays the same eye animations as Michal's
 original version but has a few modifications to the source code:
@@ -23,8 +25,11 @@ behind these holes to hide the unused pixels in the corner of the matrices.
 [[http://mjanyst.weebly.com/arduino-pumpkin-eyes.html | Michal T Janyst's Original Project Page]]\\
 [[https://www.youtube.com/watch?v=e3O-ti5n6jw | YouTube Video of Michal T Janyst's Original Project]]\\
 [[http://www.pumpkinlady.com/product/earl/ | The Pumpkin Lady's Earl Pumpkin Carving Pattern]]\\
+[[http://www.pumpkinlady.com/product/bernie/ | The Pumpkin Lady's Bernie Pumpkin Carving Pattern]]\\
 [[https://www.adafruit.com/products/1463 | Adafruit NeoPixel Ring Product Page]]\\
 [[https://www.adafruit.com/products/1854 | Adafruit 8x8 LED Matrix Product Page]]\\
+[[https://www.adafruit.com/product/1466 | Adafruit 5V 4A Switching Power Supply]]\\
+[[https://www.adafruit.com/product/373 | Adafruit Breadboard-Friendly 2.1mm DC Barrel Jack]]\\
 [[https://github.com/adamgreen/NeoPixelTree#ws2812-driver | My SPI based NeoPixel Driver]]\\
 
 
